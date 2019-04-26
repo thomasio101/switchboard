@@ -1,2 +1,2 @@
 # switchboard
-A configuration injection library for NodeJS.
+A query validation and configuration injection library for NodeJS.

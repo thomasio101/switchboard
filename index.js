@@ -9,7 +9,7 @@ class Switchboard extends EventEmitter {
 
     async send(queryName, successCallback, failureCallback, ...parameters) {
         if(this.config.hasOwnProperty(queryName)) {
-            const [queryValidator, unProcessedQueryConfig] = this.config[queryName]
+            const [queryValidators, unProcessedQueryConfig] = this.config[queryName]
 
             async function processQueryConfig(unProcessedQueryConfig) {
                 async function processQueryConfigEntry(value) {
@@ -43,11 +43,28 @@ class Switchboard extends EventEmitter {
             }
             
             const processedQueryConfig = await processQueryConfig(unProcessedQueryConfig)
+            
+            if(Array.isArray(queryValidators)) {
+                const validatorResults = await Promise.all(queryValidators.map(queryValidator => queryValidator(processedQueryConfig, ...parameters)))
 
-            const [valid, error] = await queryValidator(processedQueryConfig, ...parameters)
+                let allValid = true
 
-            if(valid) this.emit(queryName, ...parameters, successCallback)
-            else failureCallback(error)
+                for(const [valid, error] of validatorResults)
+                    if(!valid) {
+                        allValid = false
+                        failureCallback(error)
+                        break
+                    }
+
+                if(allValid) this.emit(queryName, successCallback, ...parameters)
+            } else {
+                const queryValidator = queryValidators
+
+                const [valid, error] = await queryValidator(processedQueryConfig, ...parameters)
+
+                if(valid) this.emit(queryName, successCallback, ...parameters)
+                else failureCallback(error)
+            }
         } else throw new NonExistentQueryError(queryName)
     }
 }

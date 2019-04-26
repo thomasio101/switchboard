@@ -2,10 +2,12 @@ const EventEmitter = require('events').EventEmitter
 
 class Switchboard extends EventEmitter {
     constructor(config) {
+        super()
+
         this.config = config
     }
 
-    async send(queryName, ...parameters, successCallback, failureCallback) {
+    async send(queryName, successCallback, failureCallback, ...parameters) {
         if(this.config.hasOwnProperty(queryName)) {
             const [queryValidator, unProcessedQueryConfig] = this.config[queryName]
 
@@ -13,7 +15,7 @@ class Switchboard extends EventEmitter {
                 async function processQueryConfigEntry(value) {
                     switch(typeof value) {
                         case('object'):
-                        return await processedQueryConfig(value)
+                        return await processQueryConfig(value)
                         case('function'):
                         return await value(...parameters)
                         default:
@@ -33,7 +35,7 @@ class Switchboard extends EventEmitter {
                     }
 
                     return processedQueryConfig
-                } else return Promise.all(
+                } else return await Promise.all(
                         unProcessedQueryConfig.map(
                             async entry => await processQueryConfigEntry(entry)
                         )
@@ -42,7 +44,7 @@ class Switchboard extends EventEmitter {
             
             const processedQueryConfig = await processQueryConfig(unProcessedQueryConfig)
 
-            const [valid, error] = await queryValidator(processQueryConfig, ...parameters)
+            const [valid, error] = await queryValidator(processedQueryConfig, ...parameters)
 
             if(valid) this.emit(queryName, ...parameters, successCallback)
             else failureCallback(error)
@@ -55,3 +57,5 @@ class NonExistentQueryError extends Error {
         super(`There is no query with the name "${queryName}".`)
     }
 }
+
+module.exports = Switchboard
